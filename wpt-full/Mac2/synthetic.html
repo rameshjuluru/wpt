@@ -1,0 +1,148 @@
+<html>
+<script type="text/javascript" src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<div id = "container" style = "width: 550px; height: 400px; margin: 0 auto">
+
+
+<script type="text/javascript">
+google.charts.load('current', {packages: ['corechart','line']});  
+google.charts.setOnLoadCallback(fetchWPTData);
+
+
+function fetchWPTData() {
+	fetch_result_urls('http://localhost:8080/job/wpt/',1,10);
+
+	
+}
+function fetchTestsData(testId, startTime) {
+    var dataRowArr = [];
+    $.ajax({
+        url: 'http://localhost/jsonResult.php?test='+testId,
+        cache: false,
+        dataType:'json',
+        async: false,
+        success: function(data) {
+            if(data['data']['runs']){
+                steps = data['data']['runs']['1']['firstView']['steps'];
+                if(steps) {
+                    console.log('no steps')
+                
+                    var dataElemsArr = [];
+                    dataElemsArr.push(startTime);
+                    for(var i = 0; i < steps.length; i ++) {
+                        //console.log('test: '+testId+'\tstep '+i +'\t'+startTime+'\t'+steps[i]['fullyLoaded']);
+                        //dataElem +=  '\t'+steps[i]['fullyLoaded'];
+                        //dataElem +=  ','+steps[i]['fullyLoaded'];
+                        dataElemsArr.push(steps[i]['fullyLoaded']);
+                        //dataArr.push('[{v: ['+startTime+'], f: \'\'},'+steps[i]['fullyLoaded']+']');
+                        
+                        
+                    }
+                
+                
+                    dataRowArr = dataElemsArr;
+                }else {
+                    console.log('no data for testId: '+testId);
+                }
+            }
+
+
+
+        },
+        error: function(XMLHttpRequest, textStatus, errorThrown) { 
+            console.log("Status: " + textStatus); console.log("Error: " + errorThrown); 
+        } 
+    });
+    console.log('data row arr');
+    console.log(dataRowArr);
+    return dataRowArr;
+}
+
+
+function fetch_result_urls(url, start, end) {
+    var dataArr = [];
+    var finalArr = [];
+	for(var i = start; i < end; i ++) {
+		var jenkins_url = url + i + '/console';
+		$.ajax({
+            url: jenkins_url,
+            cache: false,
+            async: false,
+            success: function(data) {
+                resp = data.split('\n');
+                testId = resp[resp.length-3].split(' ')[3]
+                //console.log(testId);
+                retArr = [];
+                $.ajax({
+                    url: 'http://localhost/testStatus.php?f=json&test='+testId,
+                    cache: false,
+                    dataType:'json',
+                    async: false,
+                    success: function(data1) {
+                        startTime = data1['data']['startTime'];
+                            if(startTime) {
+                            retArr = fetchTestsData(testId, startTime);
+                            if(retArr.length > 0) 
+                                finalArr.push(retArr);
+                        }
+  
+                    },
+                    error: function(XMLHttpRequest, textStatus, errorThrown) { 
+                        console.log("Status: " + textStatus); 
+                        console.log("Error: " + errorThrown); 
+                    } 
+                });
+
+            },
+            error: function(XMLHttpRequest, textStatus, errorThrown) { 
+                console.log("Status: " + textStatus); console.log("Error: " + errorThrown); 
+            }       
+        });
+
+	}
+    console.log('final array is ');
+        console.log(finalArr);
+        drawChart(finalArr);
+
+}
+
+function drawChart(dataArr) {
+    // Define the chart to be drawn.
+    var data = new google.visualization.DataTable();
+    data.addColumn('string', 'Date');
+    data.addColumn('number', 'Step1');
+    data.addColumn('number', 'Step2');
+    data.addColumn('number', 'Step3');
+    data.addColumn('number', 'Step4');
+    data.addColumn('number', 'Step5');
+    data.addColumn('number', 'Step6');
+    data.addRows(dataArr);
+       
+    // Set chart options
+    var options = {'title' : 'Synthetic Monitor',
+       hAxis: {
+          title: 'Date'
+       },
+       vAxis: {
+          title: 'Time (ms)',
+          viewWindowMode : 'explicit',
+          viewWindow:
+                {
+                        min: 0,
+                        max:30000
+                }
+       },   
+       'width':550,
+       'height':400,
+       pointsVisible: true    
+    };
+
+    // Instantiate and draw the chart.
+    var chart = new google.visualization.LineChart(document.getElementById('container'));
+    chart.draw(data, options);
+ }
+
+</script>
+
+
+</html>
